@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { ensureDbUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
   }
 
   const { siteId, kind, name, isDefault, config } = parsed.data;
+  const jsonConfig = config as Prisma.InputJsonValue;
 
   if (isDefault) {
     await prisma.siteChrome.updateMany({
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   const row = await prisma.siteChrome.create({
-    data: { siteId, kind, name, isDefault, config },
+    data: { siteId, kind, name, isDefault, config: jsonConfig },
   });
 
   if (isDefault) {
@@ -58,8 +60,8 @@ export async function POST(request: Request) {
       where: { id: siteId },
       data:
         kind === "HEADER"
-          ? { headerConfig: config }
-          : { footerConfig: config },
+          ? { headerConfig: jsonConfig }
+          : { footerConfig: jsonConfig },
     });
   }
 
