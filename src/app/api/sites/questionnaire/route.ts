@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import {
   ensureAgencyOrganization,
   ensureDbUser,
 } from "@/lib/auth/session";
-import { createSiteFromCommand } from "@/lib/build/create-site";
-
-const BodySchema = z.object({
-  command: z.string().min(8).max(2000),
-});
+import { createSiteFromQuestionnaire } from "@/lib/build/create-site";
+import { SiteQuestionnaireSchema } from "@/lib/build/questionnaire";
 
 export async function POST(request: Request) {
   const user = await ensureDbUser();
@@ -17,10 +13,10 @@ export async function POST(request: Request) {
   }
 
   const json = await request.json().catch(() => null);
-  const parsed = BodySchema.safeParse(json);
+  const parsed = SiteQuestionnaireSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid body", details: parsed.error.flatten() },
+      { error: "Please complete required fields", details: parsed.error.flatten() },
       { status: 400 },
     );
   }
@@ -30,9 +26,9 @@ export async function POST(request: Request) {
     user.name ? `${user.name}'s Agency` : "My Agency",
   );
 
-  const site = await createSiteFromCommand({
+  const site = await createSiteFromQuestionnaire({
     organizationId: organization.id,
-    command: parsed.data.command,
+    answers: parsed.data,
   });
 
   return NextResponse.json({
@@ -40,7 +36,7 @@ export async function POST(request: Request) {
       id: site.id,
       name: site.name,
       slug: site.slug,
-      pageCount: site.pages?.length ?? 0,
+      pageCount: site.pages.length,
     },
   });
 }

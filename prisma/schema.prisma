@@ -105,6 +105,15 @@ model Site {
   geoLat         Float?
   geoLng         Float?
   domain         String?
+  googleBusinessName String?
+  currentWebsiteUrl  String?
+  inspirationWebsiteUrl String?
+  businessHours  Json?
+  focusServices  String[] @default([])
+  insuranceAccepted Boolean @default(false)
+  insuranceInfo  String?  @db.Text
+  financingInfo  String?  @db.Text
+  questionnaire  Json?
   titlePattern   String  @default("{page} | {practice}")
   defaultOgImage String?
   robotsExtra    String?
