@@ -6,6 +6,8 @@ import {
   doctorSlug,
   type SiteQuestionnaire,
 } from "@/lib/build/questionnaire";
+import { buildFooterConfig, buildHeaderConfig } from "@/lib/site/chrome";
+import { getTemplatePack } from "@/lib/templates/packs";
 import { prisma } from "@/lib/db";
 import {
   buildBreadcrumbSchema,
@@ -40,6 +42,8 @@ export type SiteBrief = {
   patientForms?: SiteQuestionnaire["patientForms"];
   doctors?: SiteQuestionnaire["doctors"];
   teamMembers?: SiteQuestionnaire["teamMembers"];
+  templatePackId?: string;
+  figmaFileUrl?: string;
   questionnaire?: SiteQuestionnaire;
 };
 
@@ -403,6 +407,28 @@ export async function createSiteFromBrief(input: {
     doctors: doctorRecords.map((d) => ({ name: d.name, slug: d.slug })),
   });
 
+  const headerConfig = buildHeaderConfig({
+    practiceName: brief.practiceName,
+    phone: brief.phone,
+    nav: navStructure,
+  });
+  const footerConfig = buildFooterConfig({
+    practiceName: brief.practiceName,
+    phone: brief.phone,
+    email: brief.email,
+    addressLine1: brief.addressLine1,
+    city: brief.city,
+    state: brief.state,
+    postalCode: brief.postalCode,
+    nav: navStructure,
+  });
+
+  const pack = getTemplatePack(brief.templatePackId);
+  const designMode =
+    brief.templatePackId === "bespoke" || brief.figmaFileUrl
+      ? "BESPOKE"
+      : "FLAGSHIP";
+
   const site = await prisma.site.create({
     data: {
       organizationId: input.organizationId,
@@ -433,9 +459,30 @@ export async function createSiteFromBrief(input: {
       newPatientWelcome: brief.newPatientWelcome || null,
       questionnaire: brief.questionnaire ?? undefined,
       navStructure,
+      headerConfig,
+      footerConfig,
+      templatePackId: pack.id === "bespoke" ? "bespoke" : pack.id,
+      designMode,
+      figmaFileUrl: brief.figmaFileUrl || null,
       llmsSummary: `${brief.practiceName} dental practice${
         brief.city ? ` in ${brief.city}` : ""
       }${brief.services.length ? ` offering ${brief.services.join(", ")}` : ""}.`,
+      chrome: {
+        create: [
+          {
+            kind: "HEADER" as const,
+            name: "Default header",
+            isDefault: true,
+            config: headerConfig,
+          },
+          {
+            kind: "FOOTER" as const,
+            name: "Default footer",
+            isDefault: true,
+            config: footerConfig,
+          },
+        ],
+      },
       doctors: {
         create: doctorRecords.map((d) => ({
           name: d.name,
@@ -602,6 +649,8 @@ export async function createSiteFromQuestionnaire(input: {
       patientForms: a.patientForms,
       doctors: a.doctors,
       teamMembers: a.teamMembers,
+      templatePackId: a.templatePackId,
+      figmaFileUrl: a.figmaFileUrl || undefined,
       questionnaire: a,
     },
   });

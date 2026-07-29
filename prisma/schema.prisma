@@ -46,6 +46,11 @@ enum PageTemplate {
   BLOG
 }
 
+enum ChromeKind {
+  HEADER
+  FOOTER
+}
+
 enum PatientFormKind {
   PDF
   LINK
@@ -135,6 +140,12 @@ model Site {
   newPatientWelcome String? @db.Text
   questionnaire  Json?
   navStructure   Json?
+  /// Legacy snapshots of the default chrome (kept in sync with default SiteChrome rows).
+  headerConfig   Json?
+  footerConfig   Json?
+  templatePackId String?
+  designMode     String  @default("FLAGSHIP") // FLAGSHIP | BESPOKE
+  figmaFileUrl   String?
   titlePattern   String  @default("{page} | {practice}")
   defaultOgImage String?
   robotsExtra    String?
@@ -161,6 +172,7 @@ model Site {
   doctors      Doctor[]
   teamMembers  TeamMember[]
   patientForms PatientForm[]
+  chrome       SiteChrome[]
 
   @@unique([organizationId, slug])
 }
@@ -180,6 +192,25 @@ model SiteMember {
   @@unique([siteId, userId])
 }
 
+/// Editable header/footer variants. One of each kind is default for the whole site;
+/// more can be created later and assigned to specific pages.
+model SiteChrome {
+  id        String     @id @default(cuid())
+  siteId    String
+  kind      ChromeKind
+  name      String
+  isDefault Boolean    @default(false)
+  config    Json
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  site         Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  pagesHeader  Page[] @relation("PageHeader")
+  pagesFooter  Page[] @relation("PageFooter")
+
+  @@index([siteId, kind, isDefault])
+}
+
 model Page {
   id              String       @id @default(cuid())
   siteId          String
@@ -195,15 +226,20 @@ model Page {
   focusKeyword    String?
   showInNav       Boolean      @default(true)
   navOrder        Int          @default(0)
+  /// Optional override — null means use the site's default header/footer.
+  headerChromeId  String?
+  footerChromeId  String?
   schemaJson      Json?
   contentQaScore  Json?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   publishedAt     DateTime?
 
-  site     Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  sections PageSection[]
-  faqs     FaqItem[]
+  site         Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  headerChrome SiteChrome? @relation("PageHeader", fields: [headerChromeId], references: [id], onDelete: SetNull)
+  footerChrome SiteChrome? @relation("PageFooter", fields: [footerChromeId], references: [id], onDelete: SetNull)
+  sections     PageSection[]
+  faqs         FaqItem[]
 
   @@unique([siteId, slug])
 }

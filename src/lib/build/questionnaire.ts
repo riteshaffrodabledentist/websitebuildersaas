@@ -85,6 +85,17 @@ export const SiteQuestionnaireSchema = z.object({
   financingInfo: z.string().max(4000).optional().or(z.literal("")),
   hasMembershipPlan: z.boolean().default(false),
   membershipInfo: z.string().max(4000).optional().or(z.literal("")),
+  templatePackId: z
+    .enum([
+      "clinical-clean",
+      "warm-family",
+      "modern-minimal",
+      "bold-metro",
+      "soft-luxury",
+      "bespoke",
+    ])
+    .default("clinical-clean"),
+  figmaFileUrl: z.string().url().optional().or(z.literal("")),
   extraNotes: z.string().max(4000).optional().or(z.literal("")),
 });
 
@@ -149,6 +160,8 @@ export function emptyQuestionnaire(): SiteQuestionnaire {
     financingInfo: "",
     hasMembershipPlan: false,
     membershipInfo: "",
+    templatePackId: "clinical-clean",
+    figmaFileUrl: "",
     extraNotes: "",
   };
 }
