@@ -1,13 +1,42 @@
 import Link from "next/link";
+import {
+  ensureAgencyOrganization,
+  ensureDbUser,
+} from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 
-const kpis = [
-  { label: "Sites live", value: "0", href: "/agency/sites" },
-  { label: "SEO fixes needed", value: "0", href: "/agency/sites" },
-  { label: "QA failures", value: "0", href: "/agency/sites" },
-  { label: "Publishes this week", value: "0", href: "/agency/sites" },
-];
+export default async function AgencyOverviewPage() {
+  let userName = "there";
+  let orgName = "Your agency";
+  let siteCount = 0;
+  let dbOk = true;
+  let dbError: string | null = null;
 
-export default function AgencyOverviewPage() {
+  try {
+    const user = await ensureDbUser();
+    if (user) {
+      userName = user.name || user.email;
+      const org = await ensureAgencyOrganization(
+        user.id,
+        user.name ? `${user.name}'s Agency` : "My Agency",
+      );
+      orgName = org.name;
+      siteCount = await prisma.site.count({
+        where: { organizationId: org.id },
+      });
+    }
+  } catch (e) {
+    dbOk = false;
+    dbError = e instanceof Error ? e.message : "Database unavailable";
+  }
+
+  const kpis = [
+    { label: "Sites", value: String(siteCount), href: "/agency/sites" },
+    { label: "SEO fixes needed", value: "—", href: "/agency/sites" },
+    { label: "QA failures", value: "—", href: "/agency/sites" },
+    { label: "Publishes this week", value: "—", href: "/agency/sites" },
+  ];
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -16,10 +45,10 @@ export default function AgencyOverviewPage() {
             className="text-3xl text-stone-900"
             style={{ fontFamily: "var(--font-display), serif" }}
           >
-            Overview
+            Hi, {userName}
           </h1>
           <p className="mt-2 text-stone-600">
-            Build new dental sites, invite clients, and publish to Lightsail.
+            {orgName} — build dental sites, invite clients, publish to Lightsail.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -37,6 +66,21 @@ export default function AgencyOverviewPage() {
           </Link>
         </div>
       </div>
+
+      {!dbOk && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Database not connected yet</p>
+          <p className="mt-1 opacity-90">
+            {dbError}. Add a Postgres{" "}
+            <code className="rounded bg-white/70 px-1">DATABASE_URL</code> in{" "}
+            <code className="rounded bg-white/70 px-1">.env</code>, then run{" "}
+            <code className="rounded bg-white/70 px-1">
+              npx prisma migrate dev --name init
+            </code>
+            .
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => (
@@ -56,12 +100,17 @@ export default function AgencyOverviewPage() {
       </div>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-stone-900">Getting started</h2>
+        <h2 className="text-lg font-semibold text-stone-900">Setup checklist</h2>
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-stone-600">
-          <li>Connect Postgres (`DATABASE_URL`) and run `npx prisma migrate dev`.</li>
-          <li>Add Clerk keys for agency and client logins.</li>
-          <li>Build a site from a command or import an existing Cornerstone site.</li>
-          <li>Invite the practice admin — they manage editors and bloggers.</li>
+          <li>
+            Add Clerk keys (
+            <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code>,{" "}
+            <code>CLERK_SECRET_KEY</code>) from the Clerk dashboard.
+          </li>
+          <li>
+            Add Neon/Postgres <code>DATABASE_URL</code> and run migrations.
+          </li>
+          <li>Build a site from a command, then invite a client admin.</li>
         </ol>
       </section>
     </div>

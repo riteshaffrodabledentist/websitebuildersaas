@@ -1,3 +1,9 @@
+import {
+  Show,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from "@clerk/nextjs";
 import Link from "next/link";
 
 export default function HomePage() {
@@ -19,19 +25,40 @@ export default function HomePage() {
           >
             Dental SEO Builder
           </p>
-          <div className="flex gap-3">
-            <Link
-              href="/agency"
-              className="rounded-full border border-stone-300 bg-white/70 px-4 py-2 text-sm text-stone-800 backdrop-blur transition hover:bg-white"
-            >
-              Agency
-            </Link>
-            <Link
-              href="/client"
-              className="rounded-full bg-teal-700 px-4 py-2 text-sm text-white transition hover:bg-teal-800"
-            >
-              Client login
-            </Link>
+          <div className="flex items-center gap-3">
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button
+                  type="button"
+                  className="rounded-full border border-stone-300 bg-white/70 px-4 py-2 text-sm text-stone-800 backdrop-blur transition hover:bg-white"
+                >
+                  Sign in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button
+                  type="button"
+                  className="rounded-full bg-teal-700 px-4 py-2 text-sm text-white transition hover:bg-teal-800"
+                >
+                  Get started
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <Link
+                href="/agency"
+                className="rounded-full border border-stone-300 bg-white/70 px-4 py-2 text-sm text-stone-800 backdrop-blur transition hover:bg-white"
+              >
+                Agency
+              </Link>
+              <Link
+                href="/client"
+                className="rounded-full bg-teal-700 px-4 py-2 text-sm text-white transition hover:bg-teal-800"
+              >
+                Client
+              </Link>
+              <UserButton />
+            </Show>
           </div>
         </header>
 
@@ -47,17 +74,29 @@ export default function HomePage() {
             humanize then Copyleaks verify, and one Lightsail box per site.
           </p>
           <div className="mt-10 flex flex-wrap gap-4">
+            <Show when="signed-out">
+              <SignUpButton mode="modal">
+                <button
+                  type="button"
+                  className="rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
+                >
+                  Create account
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <Link
+                href="/agency/build"
+                className="rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
+              >
+                Build from command
+              </Link>
+            </Show>
             <Link
               href="/agency"
-              className="rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-stone-800"
-            >
-              Open agency dashboard
-            </Link>
-            <Link
-              href="/agency/build"
               className="rounded-full border border-stone-400 bg-white/60 px-6 py-3 text-sm font-medium text-stone-800 backdrop-blur transition hover:bg-white"
             >
-              Build from command
+              Open dashboard
             </Link>
           </div>
         </section>

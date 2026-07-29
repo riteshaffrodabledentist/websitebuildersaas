@@ -1,15 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   commandSitePages,
   parseBuildCommand,
 } from "@/lib/build/command-site";
 
 export default function BuildFromCommandPage() {
+  const router = useRouter();
   const [command, setCommand] = useState(
     "Build a site for Smile Dental, Austin TX, implants and Invisalign, phone 512-555-0100",
   );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    id: string;
+    name: string;
+    slug: string;
+    pageCount: number;
+  } | null>(null);
 
   const parsed = useMemo(() => {
     try {
@@ -20,6 +30,29 @@ export default function BuildFromCommandPage() {
   }, [command]);
 
   const pages = parsed ? commandSitePages(parsed) : [];
+
+  async function onCreate() {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/sites/build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create site");
+      }
+      setResult(data.site);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -84,17 +117,27 @@ export default function BuildFromCommandPage() {
               </li>
             ))}
           </ul>
-          <p className="text-xs text-stone-500">
-            Persist to the database after `DATABASE_URL` + Clerk are connected.
-            Generated copy will run Phrasly/RewriteAI → Copyleaks before publish.
-          </p>
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+          {result && (
+            <p className="rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">
+              Created <strong>{result.name}</strong> with {result.pageCount}{" "}
+              pages.{" "}
+              <a href="/agency/sites" className="underline">
+                View sites
+              </a>
+            </p>
+          )}
           <button
             type="button"
-            className="rounded-full bg-stone-900 px-5 py-2.5 text-sm text-white opacity-60"
-            disabled
-            title="Connect database to enable"
+            onClick={onCreate}
+            disabled={busy || !parsed}
+            className="rounded-full bg-stone-900 px-5 py-2.5 text-sm text-white disabled:opacity-50"
           >
-            Create site (connect DB)
+            {busy ? "Creating…" : "Create site"}
           </button>
         </div>
       )}

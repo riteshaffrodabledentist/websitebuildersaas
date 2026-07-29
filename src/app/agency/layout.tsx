@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { UserButton } from "@clerk/nextjs";
 
 const nav = [
   { href: "/agency", label: "Overview" },
@@ -12,7 +13,7 @@ export default function AgencyLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <div className="mx-auto flex min-h-screen max-w-7xl">
-        <aside className="hidden w-60 shrink-0 border-r border-[var(--border)] bg-white/80 p-5 md:block">
+        <aside className="hidden w-60 shrink-0 border-r border-[var(--border)] bg-white/80 p-5 md:flex md:flex-col">
           <p
             className="text-xl text-stone-900"
             style={{ fontFamily: "var(--font-display), serif" }}
@@ -30,12 +31,15 @@ export default function AgencyLayout({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          <Link
-            href="/client"
-            className="mt-10 block text-xs text-stone-500 hover:text-teal-700"
-          >
-            Switch to client →
-          </Link>
+          <div className="mt-auto space-y-3 pt-10">
+            <Link
+              href="/client"
+              className="block text-xs text-stone-500 hover:text-teal-700"
+            >
+              Switch to client →
+            </Link>
+            <UserButton />
+          </div>
         </aside>
         <div className="flex-1 p-6 md:p-10">{children}</div>
       </div>

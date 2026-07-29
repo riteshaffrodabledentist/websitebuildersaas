@@ -15,24 +15,48 @@ Multi-tenant dental website builder focused on SEO. Agencies and clients can:
 
 - Next.js (App Router) + TypeScript + Tailwind
 - PostgreSQL + Prisma
-- Clerk (auth — wire keys to enable)
+- Clerk (auth)
 - Inngest (jobs — import, QA, deploy)
 
-## Quick start
+## Setup
+
+### 1. Clone & install
 
 ```bash
-cp .env.example .env
-# set DATABASE_URL (Neon/Postgres) and optional Clerk/AI keys
-
+git clone https://github.com/riteshaffrodabledentist/websitebuildersaas.git
+cd websitebuildersaas
 npm install
-npx prisma migrate dev --name init
+cp .env.example .env
+```
+
+### 2. Clerk keys
+
+1. Create an app at [clerk.com](https://dashboard.clerk.com)
+2. Copy **Publishable key** and **Secret key** into `.env`
+3. In Clerk → Paths, set sign-in `/sign-in` and sign-up `/sign-up`
+
+### 3. Postgres
+
+Use [Neon](https://neon.tech) (free) or any Postgres. Put the connection string in `.env` as `DATABASE_URL`.
+
+```bash
+npx prisma migrate dev
+```
+
+### 4. Run
+
+```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-- `/agency` — agency dashboard, command build, import
-- `/client` — client dashboard, pages, blog, team
+- `/` — marketing + sign in
+- `/agency` — agency dashboard (protected)
+- `/agency/build` — create a site from a command (writes to DB)
+- `/client` — client dashboard (protected)
+- `/api/me` — current user + org sync
+- `/api/health` — public health check
 
 ## Repo
 
@@ -40,4 +64,4 @@ https://github.com/riteshaffrodabledentist/websitebuildersaas
 
 ## Status
 
-Foundation scaffold: data model, SEO/schema helpers, command parser, agency/client UI shells. Next: Clerk wiring, Prisma migrations against a live DB, Inngest import/publish jobs, and Lightsail deploy.
+Auth (Clerk) + Prisma model + command build → DB are wired. Next: page editor, content QA APIs, Cornerstone import jobs, Lightsail publish.
