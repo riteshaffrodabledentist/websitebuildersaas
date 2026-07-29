@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AgencyRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum ClientRole {
+  CLIENT_ADMIN
+  CLIENT_EDITOR
+  CLIENT_BLOGGER
+  CLIENT_VIEWER
+}
+
+enum PageStatus {
+  DRAFT
+  IN_REVIEW
+  READY
+  LIVE
+  UNPUBLISHED
+}
+
+enum PageTemplate {
+  HOME
+  SERVICE
+  ABOUT
+  LOCATION
+  CONTACT
+  CUSTOM
+}
+
+enum AltSource {
+  AI
+  HUMAN
+  IMPORT
+}
+
+enum GeoSource {
+  SITE_NAP
+  OVERRIDE
+  NONE
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  clerkOrgId String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members AgencyMember[]
+  sites   Site[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agencyMemberships AgencyMember[]
+  siteMemberships   SiteMember[]
+  auditLogs         AuditLog[]
+}
+
+model AgencyMember {
+  id             String     @id @default(cuid())
+  organizationId String
+  userId         String
+  role           AgencyRole @default(EDITOR)
+  createdAt      DateTime   @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Site {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  practiceName   String?
+  phone          String?
+  email          String?
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  postalCode     String?
+  country        String  @default("US")
+  geoLat         Float?
+  geoLng         Float?
+  domain         String?
+  titlePattern   String  @default("{page} | {practice}")
+  defaultOgImage String?
+  robotsExtra    String?
+  llmsSummary    String?
+  clientsCanPublish     Boolean @default(false)
+  clientsCanCreatePages Boolean @default(true)
+  clientsCanBuildSite   Boolean @default(false)
+  editorsCanBlog        Boolean @default(false)
+  requireAgencyApproval Boolean @default(true)
+  lightsailInstanceId   String?
+  lightsailRegion       String?
+  lightsailIp           String?
+  lastPublishHash       String?
+  lastPublishedAt       DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      SiteMember[]
+  pages        Page[]
+  posts        BlogPost[]
+  media        MediaAsset[]
+  redirects    Redirect[]
+
+  @@unique([organizationId, slug])
+}
+
+model SiteMember {
+  id        String     @id @default(cuid())
+  siteId    String
+  userId    String
+  role      ClientRole @default(CLIENT_EDITOR)
+  status    String     @default("active") // invited | active | suspended
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, userId])
+}
+
+model Page {
+  id              String       @id @default(cuid())
+  siteId          String
+  title           String
+  slug            String
+  template        PageTemplate @default(CUSTOM)
+  status          PageStatus   @default(DRAFT)
+  h1              String
+  metaTitle       String?
+  metaDescription String?
+  canonical       String?
+  ogImage         String?
+  focusKeyword    String?
+  showInNav       Boolean      @default(true)
+  navOrder        Int          @default(0)
+  schemaJson      Json?
+  contentQaScore  Json?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  publishedAt     DateTime?
+
+  site     Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  sections PageSection[]
+  faqs     FaqItem[]
+
+  @@unique([siteId, slug])
+}
+
+model PageSection {
+  id        String   @id @default(cuid())
+  pageId    String
+  type      String
+  sortOrder Int      @default(0)
+  heading   String?
+  headingLevel Int   @default(2) // locked by catalog; 1|2|3
+  body      String?  @db.Text
+  data      Json?
+  contentQa Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+}
+
+model FaqItem {
+  id        String   @id @default(cuid())
+  pageId    String
+  question  String
+  answer    String   @db.Text
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+}
+
+model BlogPost {
+  id              String     @id @default(cuid())
+  siteId          String
+  title           String
+  slug            String
+  excerpt         String?
+  body            String     @db.Text
+  coverImageId    String?
+  metaTitle       String?
+  metaDescription String?
+  status          PageStatus @default(DRAFT)
+  categories      String[]
+  tags            String[]
+  authorName      String?
+  schemaJson      Json?
+  contentQaScore  Json?
+  publishedAt     DateTime?
+  sourceUrl       String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+}
+
+model MediaAsset {
+  id          String    @id @default(cuid())
+  siteId      String
+  url         String
+  filename    String
+  mimeType    String?
+  alt         String?
+  altSource   AltSource @default(AI)
+  altReviewed Boolean   @default(false)
+  geoLat      Float?
+  geoLng      Float?
+  geoSource   GeoSource @default(SITE_NAP)
+  geoAppliedAt DateTime?
+  width       Int?
+  height      Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}
+
+model Redirect {
+  id         String   @id @default(cuid())
+  siteId     String
+  fromPath   String
+  toPath     String
+  statusCode Int      @default(301)
+  createdAt  DateTime @default(now())
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, fromPath])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  siteId    String?
+  action    String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
