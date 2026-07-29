@@ -36,6 +36,14 @@ enum PageTemplate {
   LOCATION
   CONTACT
   CUSTOM
+  DOCTORS
+  DOCTOR
+  TEAM
+  NEW_PATIENTS
+  INSURANCE
+  FINANCING
+  MEMBERSHIP
+  BLOG
 }
 
 enum AltSource {
@@ -111,9 +119,17 @@ model Site {
   businessHours  Json?
   focusServices  String[] @default([])
   insuranceAccepted Boolean @default(false)
+  insuranceInNetwork Boolean @default(false)
   insuranceInfo  String?  @db.Text
+  insuranceLogos String[] @default([])
   financingInfo  String?  @db.Text
+  financingProviders String[] @default([])
+  hasMembershipPlan Boolean @default(false)
+  membershipInfo String? @db.Text
+  aboutContent   String?  @db.Text
+  newPatientWelcome String? @db.Text
   questionnaire  Json?
+  navStructure   Json?
   titlePattern   String  @default("{page} | {practice}")
   defaultOgImage String?
   robotsExtra    String?
@@ -137,6 +153,9 @@ model Site {
   posts        BlogPost[]
   media        MediaAsset[]
   redirects    Redirect[]
+  doctors      Doctor[]
+  teamMembers  TeamMember[]
+  patientForms PatientForm[]
 
   @@unique([organizationId, slug])
 }
@@ -270,6 +289,53 @@ model Redirect {
   site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
   @@unique([siteId, fromPath])
+}
+
+model Doctor {
+  id          String   @id @default(cuid())
+  siteId      String
+  name        String
+  slug        String
+  credentials String?
+  title       String?
+  bio         String?  @db.Text
+  photoUrl    String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, slug])
+}
+
+/// Staff bios appear on Meet the Team only — no individual pages.
+model TeamMember {
+  id        String   @id @default(cuid())
+  siteId    String
+  name      String
+  role      String?
+  bio       String?  @db.Text
+  photoUrl  String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+}
+
+/// Client-managed new-patient paperwork uploads.
+model PatientForm {
+  id          String   @id @default(cuid())
+  siteId      String
+  title       String
+  description String?
+  fileUrl     String
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {

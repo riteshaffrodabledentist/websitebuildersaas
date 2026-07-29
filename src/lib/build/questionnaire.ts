@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { slugify } from "@/lib/build/command-site";
 
 export const DayHoursSchema = z.object({
   day: z.enum([
@@ -11,9 +12,43 @@ export const DayHoursSchema = z.object({
     "sunday",
   ]),
   closed: z.boolean().default(false),
-  open: z.string().optional(), // "09:00"
-  close: z.string().optional(), // "17:00"
+  open: z.string().optional(),
+  close: z.string().optional(),
 });
+
+export const DoctorInputSchema = z.object({
+  name: z.string().min(2).max(120),
+  credentials: z.string().max(80).optional().or(z.literal("")),
+  title: z.string().max(120).optional().or(z.literal("")),
+  bio: z.string().max(8000).optional().or(z.literal("")),
+});
+
+export const TeamInputSchema = z.object({
+  name: z.string().min(2).max(120),
+  role: z.string().max(120).optional().or(z.literal("")),
+  bio: z.string().max(4000).optional().or(z.literal("")),
+});
+
+export const FINANCING_OPTIONS = [
+  "CareCredit",
+  "Sunbit",
+  "Cherry",
+  "In-house financing",
+  "Charity / assistance programs",
+] as const;
+
+export const INSURANCE_LOGO_OPTIONS = [
+  "Delta Dental",
+  "Cigna",
+  "Aetna",
+  "MetLife",
+  "Guardian",
+  "United Healthcare",
+  "Blue Cross Blue Shield",
+  "Humana",
+  "GEHA",
+  "Medicaid",
+] as const;
 
 export const SiteQuestionnaireSchema = z.object({
   businessName: z.string().min(2).max(120),
@@ -28,10 +63,20 @@ export const SiteQuestionnaireSchema = z.object({
   focusServices: z.array(z.string().min(1)).min(1).max(20),
   currentWebsiteUrl: z.string().url().optional().or(z.literal("")),
   inspirationWebsiteUrl: z.string().url().optional().or(z.literal("")),
+  aboutContent: z.string().max(20000).optional().or(z.literal("")),
+  fetchAboutFromCurrentSite: z.boolean().default(false),
+  doctors: z.array(DoctorInputSchema).default([]),
+  teamMembers: z.array(TeamInputSchema).default([]),
+  newPatientWelcome: z.string().max(8000).optional().or(z.literal("")),
   businessHours: z.array(DayHoursSchema).default([]),
   insuranceAccepted: z.boolean().default(false),
+  insuranceInNetwork: z.boolean().default(false),
   insuranceInfo: z.string().max(4000).optional().or(z.literal("")),
+  insuranceLogos: z.array(z.string()).default([]),
+  financingProviders: z.array(z.string()).default([]),
   financingInfo: z.string().max(4000).optional().or(z.literal("")),
+  hasMembershipPlan: z.boolean().default(false),
+  membershipInfo: z.string().max(4000).optional().or(z.literal("")),
   extraNotes: z.string().max(4000).optional().or(z.literal("")),
 });
 
@@ -80,10 +125,69 @@ export function emptyQuestionnaire(): SiteQuestionnaire {
     focusServices: ["General dentistry"],
     currentWebsiteUrl: "",
     inspirationWebsiteUrl: "",
+    aboutContent: "",
+    fetchAboutFromCurrentSite: false,
+    doctors: [{ name: "", credentials: "DDS", title: "Dentist", bio: "" }],
+    teamMembers: [],
+    newPatientWelcome:
+      "Welcome to our practice! We’re excited to meet you. Complete your paperwork before your visit to save time at check-in.",
     businessHours: DEFAULT_HOURS,
     insuranceAccepted: true,
+    insuranceInNetwork: true,
     insuranceInfo: "",
+    insuranceLogos: [],
+    financingProviders: [],
     financingInfo: "",
+    hasMembershipPlan: false,
+    membershipInfo: "",
     extraNotes: "",
   };
+}
+
+export function doctorSlug(name: string) {
+  return slugify(name) || "doctor";
+}
+
+/** Top-level + nested nav for published sites */
+export function buildNavStructure(input: {
+  services: string[];
+  hasMembership: boolean;
+  doctors: { name: string; slug: string }[];
+}) {
+  return [
+    { label: "Home", href: "/" },
+    {
+      label: "About Us",
+      href: "/about",
+      children: [
+        { label: "Meet the Doctors", href: "/about/doctors" },
+        { label: "Meet the Team", href: "/about/team" },
+        ...input.doctors.map((d) => ({
+          label: d.name,
+          href: `/about/doctors/${d.slug}`,
+        })),
+      ],
+    },
+    {
+      label: "Services",
+      href: "/services",
+      children: input.services.map((s) => ({
+        label: s,
+        href: `/services/${slugify(s)}`,
+      })),
+    },
+    {
+      label: "New Patients",
+      href: "/new-patients",
+      children: [
+        { label: "Insurance", href: "/new-patients/insurance" },
+        { label: "Financing", href: "/new-patients/financing" },
+        ...(input.hasMembership
+          ? [{ label: "Membership plan", href: "/new-patients/membership" }]
+          : []),
+      ],
+    },
+    { label: "Contact Us", href: "/contact" },
+    { label: "Blog", href: "/blog" },
+  ];
 }

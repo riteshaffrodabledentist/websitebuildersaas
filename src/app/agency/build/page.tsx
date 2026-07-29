@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DEFAULT_HOURS,
+  FINANCING_OPTIONS,
+  INSURANCE_LOGO_OPTIONS,
   SERVICE_OPTIONS,
   emptyQuestionnaire,
   type SiteQuestionnaire,
@@ -15,10 +17,11 @@ import {
 
 const STEPS = [
   "Business",
+  "About & people",
   "Services",
   "Websites",
   "Hours",
-  "Insurance & financing",
+  "New patients",
   "Review",
 ] as const;
 
@@ -55,14 +58,16 @@ export default function BuildSitePage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function toggleService(service: string) {
+  function toggleInList(
+    key: "focusServices" | "insuranceLogos" | "financingProviders",
+    value: string,
+  ) {
     setForm((prev) => {
-      const has = prev.focusServices.includes(service);
+      const list = prev[key];
+      const has = list.includes(value);
       return {
         ...prev,
-        focusServices: has
-          ? prev.focusServices.filter((s) => s !== service)
-          : [...prev.focusServices, service],
+        [key]: has ? list.filter((s) => s !== value) : [...list, value],
       };
     });
   }
@@ -78,9 +83,7 @@ export default function BuildSitePage() {
         body: JSON.stringify(form),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create site");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to create site");
       setResult(data.site);
       router.refresh();
     } catch (e) {
@@ -121,11 +124,12 @@ export default function BuildSitePage() {
           Build a dental website
         </h1>
         <p className="mt-2 text-stone-600">
-          Answer a short questionnaire (recommended), or use a free-form command.
+          Full site IA: About (doctors + team), Services, New Patients
+          (forms / insurance / financing / membership), Contact, and Blog.
         </p>
       </div>
 
-      <div className="flex gap-2 rounded-full border border-stone-200 bg-white p-1 w-fit">
+      <div className="flex w-fit gap-2 rounded-full border border-stone-200 bg-white p-1">
         <button
           type="button"
           onClick={() => setMode("questionnaire")}
@@ -154,27 +158,16 @@ export default function BuildSitePage() {
             value={command}
             onChange={(e) => setCommand(e.target.value)}
             rows={4}
-            className="w-full rounded-xl border border-stone-300 p-4 text-sm outline-none ring-teal-600 focus:ring-2"
+            className="field"
           />
           {parsedCommand && (
             <p className="text-sm text-stone-600">
-              Will create {commandSitePages(parsedCommand).length} pages for{" "}
-              <strong>{parsedCommand.practiceName}</strong>
+              Quick scaffold for <strong>{parsedCommand.practiceName}</strong>{" "}
+              ({commandSitePages(parsedCommand).length}+ core pages; prefer
+              questionnaire for full IA).
             </p>
           )}
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </p>
-          )}
-          {result && (
-            <p className="rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">
-              Created <strong>{result.name}</strong> ({result.pageCount} pages).{" "}
-              <a href="/agency/sites" className="underline">
-                View sites
-              </a>
-            </p>
-          )}
+          <ResultBlock error={error} result={result} />
           <button
             type="button"
             disabled={busy || !parsedCommand}
@@ -211,107 +204,244 @@ export default function BuildSitePage() {
                 <input
                   value={form.businessName}
                   onChange={(e) => update("businessName", e.target.value)}
-                  className="input"
-                  placeholder="Smile Dental"
+                  className="field"
                 />
               </Field>
               <Field label="Google Business name" className="sm:col-span-2">
                 <input
                   value={form.googleBusinessName || ""}
                   onChange={(e) => update("googleBusinessName", e.target.value)}
-                  className="input"
-                  placeholder="Same as Google listing if different"
+                  className="field"
                 />
               </Field>
               <Field label="Phone *">
                 <input
                   value={form.phone}
                   onChange={(e) => update("phone", e.target.value)}
-                  className="input"
-                  placeholder="+91 ... or (512) ..."
+                  className="field"
                 />
               </Field>
               <Field label="Email">
                 <input
                   value={form.email || ""}
                   onChange={(e) => update("email", e.target.value)}
-                  className="input"
-                  placeholder="hello@practice.com"
+                  className="field"
                 />
               </Field>
               <Field label="Street address" className="sm:col-span-2">
                 <input
                   value={form.addressLine1 || ""}
                   onChange={(e) => update("addressLine1", e.target.value)}
-                  className="input"
+                  className="field"
                 />
               </Field>
               <Field label="City">
                 <input
                   value={form.city || ""}
                   onChange={(e) => update("city", e.target.value)}
-                  className="input"
+                  className="field"
                 />
               </Field>
               <Field label="State">
                 <input
                   value={form.state || ""}
                   onChange={(e) => update("state", e.target.value)}
-                  className="input"
-                />
-              </Field>
-              <Field label="Postal code">
-                <input
-                  value={form.postalCode || ""}
-                  onChange={(e) => update("postalCode", e.target.value)}
-                  className="input"
-                />
-              </Field>
-              <Field label="Country">
-                <input
-                  value={form.country || "US"}
-                  onChange={(e) => update("country", e.target.value)}
-                  className="input"
+                  className="field"
                 />
               </Field>
             </div>
           )}
 
           {step === 1 && (
-            <div className="space-y-3">
-              <p className="text-sm text-stone-600">
-                Select focus services (at least one). These become service pages.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {SERVICE_OPTIONS.map((service) => {
-                  const on = form.focusServices.includes(service);
-                  return (
-                    <button
-                      key={service}
-                      type="button"
-                      onClick={() => toggleService(service)}
-                      className={`rounded-full border px-3 py-1.5 text-sm ${
-                        on
-                          ? "border-teal-700 bg-teal-700 text-white"
-                          : "border-stone-300 bg-white text-stone-700"
-                      }`}
+            <div className="space-y-5">
+              <Field label="About Us content (full story for /about)">
+                <textarea
+                  value={form.aboutContent || ""}
+                  onChange={(e) => update("aboutContent", e.target.value)}
+                  rows={5}
+                  className="field"
+                  placeholder="Paste existing about text — we can rewrite/humanize later"
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.fetchAboutFromCurrentSite}
+                  onChange={(e) =>
+                    update("fetchAboutFromCurrentSite", e.target.checked)
+                  }
+                />
+                Later: fetch About from current website & rewrite (flag for import job)
+              </label>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-semibold">Doctors (individual pages)</h3>
+                  <button
+                    type="button"
+                    className="text-sm text-teal-700"
+                    onClick={() =>
+                      update("doctors", [
+                        ...form.doctors,
+                        { name: "", credentials: "DDS", title: "Dentist", bio: "" },
+                      ])
+                    }
+                  >
+                    + Add doctor
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {form.doctors.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="grid gap-2 rounded-xl border border-stone-200 p-3 sm:grid-cols-2"
                     >
-                      {service}
-                    </button>
-                  );
-                })}
+                      <input
+                        className="field"
+                        placeholder="Name *"
+                        value={doc.name}
+                        onChange={(e) => {
+                          const next = [...form.doctors];
+                          next[idx] = { ...next[idx], name: e.target.value };
+                          update("doctors", next);
+                        }}
+                      />
+                      <input
+                        className="field"
+                        placeholder="Credentials (DDS)"
+                        value={doc.credentials || ""}
+                        onChange={(e) => {
+                          const next = [...form.doctors];
+                          next[idx] = {
+                            ...next[idx],
+                            credentials: e.target.value,
+                          };
+                          update("doctors", next);
+                        }}
+                      />
+                      <input
+                        className="field sm:col-span-2"
+                        placeholder="Title"
+                        value={doc.title || ""}
+                        onChange={(e) => {
+                          const next = [...form.doctors];
+                          next[idx] = { ...next[idx], title: e.target.value };
+                          update("doctors", next);
+                        }}
+                      />
+                      <textarea
+                        className="field sm:col-span-2"
+                        rows={2}
+                        placeholder="Bio"
+                        value={doc.bio || ""}
+                        onChange={(e) => {
+                          const next = [...form.doctors];
+                          next[idx] = { ...next[idx], bio: e.target.value };
+                          update("doctors", next);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-semibold">
+                    Team (bios on Meet the Team only — no individual pages)
+                  </h3>
+                  <button
+                    type="button"
+                    className="text-sm text-teal-700"
+                    onClick={() =>
+                      update("teamMembers", [
+                        ...form.teamMembers,
+                        { name: "", role: "", bio: "" },
+                      ])
+                    }
+                  >
+                    + Add team member
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {form.teamMembers.map((tm, idx) => (
+                    <div
+                      key={idx}
+                      className="grid gap-2 rounded-xl border border-stone-200 p-3 sm:grid-cols-2"
+                    >
+                      <input
+                        className="field"
+                        placeholder="Name"
+                        value={tm.name}
+                        onChange={(e) => {
+                          const next = [...form.teamMembers];
+                          next[idx] = { ...next[idx], name: e.target.value };
+                          update("teamMembers", next);
+                        }}
+                      />
+                      <input
+                        className="field"
+                        placeholder="Role"
+                        value={tm.role || ""}
+                        onChange={(e) => {
+                          const next = [...form.teamMembers];
+                          next[idx] = { ...next[idx], role: e.target.value };
+                          update("teamMembers", next);
+                        }}
+                      />
+                      <textarea
+                        className="field sm:col-span-2"
+                        rows={2}
+                        placeholder="Bio"
+                        value={tm.bio || ""}
+                        onChange={(e) => {
+                          const next = [...form.teamMembers];
+                          next[idx] = { ...next[idx], bio: e.target.value };
+                          update("teamMembers", next);
+                        }}
+                      />
+                    </div>
+                  ))}
+                  {form.teamMembers.length === 0 && (
+                    <p className="text-sm text-stone-500">
+                      Optional — you can add team later in the CMS.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {step === 2 && (
+            <div className="flex flex-wrap gap-2">
+              {SERVICE_OPTIONS.map((service) => {
+                const on = form.focusServices.includes(service);
+                return (
+                  <button
+                    key={service}
+                    type="button"
+                    onClick={() => toggleInList("focusServices", service)}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${
+                      on
+                        ? "border-teal-700 bg-teal-700 text-white"
+                        : "border-stone-300 bg-white text-stone-700"
+                    }`}
+                  >
+                    {service}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {step === 3 && (
             <div className="grid gap-3">
-              <Field label="Current website (to clone or replace later)">
+              <Field label="Current website">
                 <input
                   value={form.currentWebsiteUrl || ""}
                   onChange={(e) => update("currentWebsiteUrl", e.target.value)}
-                  className="input"
-                  placeholder="https://old-site.com"
+                  className="field"
+                  placeholder="https://..."
                 />
               </Field>
               <Field label="Inspiration website">
@@ -320,18 +450,14 @@ export default function BuildSitePage() {
                   onChange={(e) =>
                     update("inspirationWebsiteUrl", e.target.value)
                   }
-                  className="input"
-                  placeholder="https://site-you-like.com"
+                  className="field"
+                  placeholder="https://..."
                 />
               </Field>
-              <p className="text-xs text-stone-500">
-                Inspiration is stored for design direction. Current site can be
-                imported via Cornerstone import later.
-              </p>
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="space-y-3">
               {(form.businessHours?.length
                 ? form.businessHours
@@ -363,7 +489,7 @@ export default function BuildSitePage() {
                       next[idx] = { ...next[idx], open: e.target.value };
                       update("businessHours", next);
                     }}
-                    className="input"
+                    className="field"
                   />
                   <input
                     type="time"
@@ -374,16 +500,29 @@ export default function BuildSitePage() {
                       next[idx] = { ...next[idx], close: e.target.value };
                       update("businessHours", next);
                     }}
-                    className="input"
+                    className="field"
                   />
                 </div>
               ))}
             </div>
           )}
 
-          {step === 4 && (
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm text-stone-800">
+          {step === 5 && (
+            <div className="space-y-4">
+              <Field label="New patient welcome text">
+                <textarea
+                  value={form.newPatientWelcome || ""}
+                  onChange={(e) => update("newPatientWelcome", e.target.value)}
+                  rows={3}
+                  className="field"
+                />
+              </Field>
+              <p className="text-xs text-stone-500">
+                Paperwork PDFs are added later in the client CMS under New
+                Patients → Forms.
+              </p>
+
+              <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={form.insuranceAccepted}
@@ -391,78 +530,140 @@ export default function BuildSitePage() {
                     update("insuranceAccepted", e.target.checked)
                   }
                 />
-                We accept dental insurance
+                Accept dental insurance
               </label>
-              <Field label="Insurance details (plans, notes)">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.insuranceInNetwork}
+                  onChange={(e) =>
+                    update("insuranceInNetwork", e.target.checked)
+                  }
+                />
+                We are an in-network office
+              </label>
+              <Field label="Insurance details">
                 <textarea
                   value={form.insuranceInfo || ""}
                   onChange={(e) => update("insuranceInfo", e.target.value)}
-                  rows={3}
-                  className="input"
-                  placeholder="Delta Dental, Cigna, in-network notes…"
+                  rows={2}
+                  className="field"
                 />
               </Field>
-              <Field label="Financing information">
+              <div>
+                <p className="mb-2 text-sm font-medium">Insurance logos / plans</p>
+                <div className="flex flex-wrap gap-2">
+                  {INSURANCE_LOGO_OPTIONS.map((name) => {
+                    const on = form.insuranceLogos.includes(name);
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => toggleInList("insuranceLogos", name)}
+                        className={`rounded-full border px-3 py-1 text-xs ${
+                          on
+                            ? "border-teal-700 bg-teal-700 text-white"
+                            : "border-stone-300"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium">Financing options</p>
+                <div className="flex flex-wrap gap-2">
+                  {FINANCING_OPTIONS.map((name) => {
+                    const on = form.financingProviders.includes(name);
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() =>
+                          toggleInList("financingProviders", name)
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs ${
+                          on
+                            ? "border-teal-700 bg-teal-700 text-white"
+                            : "border-stone-300"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <Field label="Financing notes">
                 <textarea
                   value={form.financingInfo || ""}
                   onChange={(e) => update("financingInfo", e.target.value)}
-                  rows={3}
-                  className="input"
-                  placeholder="CareCredit, in-house plans, 0% promos…"
-                />
-              </Field>
-              <Field label="Anything else we should know?">
-                <textarea
-                  value={form.extraNotes || ""}
-                  onChange={(e) => update("extraNotes", e.target.value)}
                   rows={2}
-                  className="input"
+                  className="field"
                 />
               </Field>
+
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={form.hasMembershipPlan}
+                  onChange={(e) =>
+                    update("hasMembershipPlan", e.target.checked)
+                  }
+                />
+                We have a membership plan (creates /new-patients/membership)
+              </label>
+              {form.hasMembershipPlan && (
+                <Field label="Membership plan details">
+                  <textarea
+                    value={form.membershipInfo || ""}
+                    onChange={(e) => update("membershipInfo", e.target.value)}
+                    rows={3}
+                    className="field"
+                  />
+                </Field>
+              )}
             </div>
           )}
 
-          {step === 5 && (
-            <div className="space-y-3 text-sm text-stone-700">
+          {step === 6 && (
+            <div className="space-y-2 text-sm text-stone-700">
               <p>
-                <strong>{form.businessName || "—"}</strong>
-                {form.googleBusinessName
-                  ? ` · GBP: ${form.googleBusinessName}`
-                  : ""}
+                <strong>{form.businessName || "—"}</strong> · {form.phone}
               </p>
               <p>
-                {form.phone} · {[form.city, form.state].filter(Boolean).join(", ")}
+                Doctors:{" "}
+                {form.doctors.filter((d) => d.name).map((d) => d.name).join(", ") ||
+                  "—"}
               </p>
-              <p>Services: {form.focusServices.join(", ") || "—"}</p>
               <p>
-                Current site: {form.currentWebsiteUrl || "—"} · Inspiration:{" "}
-                {form.inspirationWebsiteUrl || "—"}
+                Team:{" "}
+                {form.teamMembers
+                  .filter((t) => t.name)
+                  .map((t) => t.name)
+                  .join(", ") || "—"}
               </p>
+              <p>Services: {form.focusServices.join(", ")}</p>
               <p>
                 Insurance: {form.insuranceAccepted ? "Yes" : "No"}
-                {form.financingInfo ? " · Financing notes included" : ""}
+                {form.insuranceInNetwork ? " (in-network)" : ""} · Financing:{" "}
+                {form.financingProviders.join(", ") || "—"}
+                {form.hasMembershipPlan ? " · Membership page: Yes" : ""}
               </p>
-              <p className="text-stone-500">
-                We’ll create Home, About, service pages, Location, Contact, FAQ
-                on every page, plus Financing if you provided financing info.
-              </p>
+              <ul className="list-disc pl-5 text-stone-500">
+                <li>About Us + Meet Doctors + doctor profiles + Meet Team</li>
+                <li>Services menu + each focus service page</li>
+                <li>New Patients + Insurance + Financing (+ Membership)</li>
+                <li>Contact Us + Blog index</li>
+                <li>FAQ on every page · forms uploadable in CMS</li>
+              </ul>
             </div>
           )}
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </p>
-          )}
-          {result && (
-            <p className="rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">
-              Created <strong>{result.name}</strong> with {result.pageCount}{" "}
-              pages.{" "}
-              <a href="/agency/sites" className="underline">
-                View sites
-              </a>
-            </p>
-          )}
+          <ResultBlock error={error} result={result} />
 
           <div className="flex justify-between pt-2">
             <button
@@ -494,7 +695,47 @@ export default function BuildSitePage() {
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        .field {
+          width: 100%;
+          border-radius: 0.75rem;
+          border: 1px solid #d6d3d1;
+          padding: 0.65rem 0.85rem;
+          font-size: 0.875rem;
+          outline: none;
+        }
+        .field:focus {
+          box-shadow: 0 0 0 2px #0f766e55;
+        }
+      `}</style>
     </div>
+  );
+}
+
+function ResultBlock({
+  error,
+  result,
+}: {
+  error: string | null;
+  result: { name: string; pageCount: number } | null;
+}) {
+  return (
+    <>
+      {error && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      {result && (
+        <p className="rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">
+          Created <strong>{result.name}</strong> with {result.pageCount} pages.{" "}
+          <a href="/agency/sites" className="underline">
+            View sites
+          </a>
+        </p>
+      )}
+    </>
   );
 }
 
@@ -510,9 +751,7 @@ function Field({
   return (
     <label className={`block text-sm ${className}`}>
       <span className="mb-1.5 block font-medium text-stone-700">{label}</span>
-      <div className="[&_input]:w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-stone-300 [&_input]:px-3.5 [&_input]:py-2.5 [&_input]:text-sm [&_input]:outline-none focus-within:[&_input]:ring-2 focus-within:[&_input]:ring-teal-700/40 [&_textarea]:w-full [&_textarea]:rounded-xl [&_textarea]:border [&_textarea]:border-stone-300 [&_textarea]:px-3.5 [&_textarea]:py-2.5 [&_textarea]:text-sm [&_textarea]:outline-none">
-        {children}
-      </div>
+      {children}
     </label>
   );
 }

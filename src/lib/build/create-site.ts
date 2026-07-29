@@ -1,12 +1,11 @@
 import { PAGE_TEMPLATES, SECTION_CATALOG } from "@/lib/sections/catalog";
 import type { SectionType } from "@/lib/sections/catalog";
+import { parseBuildCommand, slugify } from "@/lib/build/command-site";
 import {
-  commandSitePages,
-  parseBuildCommand,
-  slugify,
-} from "@/lib/build/command-site";
-import type { BuildCommand } from "@/lib/build/command-site";
-import type { SiteQuestionnaire } from "@/lib/build/questionnaire";
+  buildNavStructure,
+  doctorSlug,
+  type SiteQuestionnaire,
+} from "@/lib/build/questionnaire";
 import { prisma } from "@/lib/db";
 import {
   buildBreadcrumbSchema,
@@ -29,35 +28,76 @@ export type SiteBrief = {
   inspirationWebsiteUrl?: string;
   businessHours?: SiteQuestionnaire["businessHours"];
   insuranceAccepted?: boolean;
+  insuranceInNetwork?: boolean;
   insuranceInfo?: string;
+  insuranceLogos?: string[];
   financingInfo?: string;
+  financingProviders?: string[];
+  hasMembershipPlan?: boolean;
+  membershipInfo?: string;
+  aboutContent?: string;
+  newPatientWelcome?: string;
+  doctors?: SiteQuestionnaire["doctors"];
+  teamMembers?: SiteQuestionnaire["teamMembers"];
   questionnaire?: SiteQuestionnaire;
-  bilingual?: boolean;
+};
+
+type PageSpec = {
+  title: string;
+  slug: string;
+  template:
+    | "HOME"
+    | "SERVICE"
+    | "ABOUT"
+    | "LOCATION"
+    | "CONTACT"
+    | "CUSTOM"
+    | "DOCTORS"
+    | "DOCTOR"
+    | "TEAM"
+    | "NEW_PATIENTS"
+    | "INSURANCE"
+    | "FINANCING"
+    | "MEMBERSHIP"
+    | "BLOG";
+  h1: string;
+  showInNav?: boolean;
+  navOrder?: number;
+  bodyOverride?: string;
 };
 
 function defaultFaqs(brief: SiteBrief, count: number) {
   const practiceName = brief.practiceName;
   const insuranceAnswer = brief.insuranceAccepted
-    ? brief.insuranceInfo?.trim() ||
-      "Yes — we work with many major dental insurance plans. Contact us with your plan details and we will help verify benefits."
-    : "We do not currently list accepted insurance plans online. Call us and we will help you understand payment options.";
+    ? [
+        brief.insuranceInNetwork
+          ? "Yes — we are an in-network office for many plans."
+          : "Yes — we work with many dental insurance plans.",
+        brief.insuranceInfo?.trim(),
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "Call us and we will help you understand payment options.";
 
-  const financingAnswer =
-    brief.financingInfo?.trim() ||
-    "Ask our team about flexible financing and payment options for treatment.";
+  const financingBits = [
+    ...(brief.financingProviders || []),
+    brief.financingInfo?.trim(),
+  ].filter(Boolean);
 
   const seeds = [
     {
       question: `How do I book an appointment at ${practiceName}?`,
-      answer: `Call ${brief.phone || "our office"} or use the contact form on this website to schedule your visit with ${practiceName}.`,
+      answer: `Call ${brief.phone || "our office"} or use the contact form to schedule with ${practiceName}.`,
     },
     {
       question: "Do you accept dental insurance?",
       answer: insuranceAnswer,
     },
     {
-      question: "Do you offer financing?",
-      answer: financingAnswer,
+      question: "What financing options do you offer?",
+      answer: financingBits.length
+        ? financingBits.join(" · ")
+        : "Ask our team about flexible financing for treatment.",
     },
     {
       question: "Where is the practice located?",
@@ -70,9 +110,9 @@ function defaultFaqs(brief: SiteBrief, count: number) {
         .join(" — "),
     },
     {
-      question: "What should I bring to my first visit?",
+      question: "What paperwork do new patients need?",
       answer:
-        "Please bring a photo ID, insurance card if applicable, and a list of current medications.",
+        "Download new-patient forms from our New Patients page, or we can email them before your visit.",
     },
   ];
   return seeds.slice(0, Math.max(1, count)).map((f, i) => ({
@@ -81,35 +121,239 @@ function defaultFaqs(brief: SiteBrief, count: number) {
   }));
 }
 
-function briefToCommand(brief: SiteBrief): BuildCommand {
-  return {
-    practiceName: brief.practiceName,
-    city: brief.city,
-    state: brief.state,
-    phone: brief.phone,
-    services: brief.services,
-    bilingual: brief.bilingual ?? false,
-    raw: `questionnaire:${brief.practiceName}`,
-  };
+function buildPageSpecs(brief: SiteBrief): {
+  pages: PageSpec[];
+  doctorRecords: { name: string; slug: string; credentials?: string; title?: string; bio?: string; sortOrder: number }[];
+  teamRecords: { name: string; role?: string; bio?: string; sortOrder: number }[];
+} {
+  const doctors = (brief.doctors || [])
+    .filter((d) => d.name.trim())
+    .map((d, i) => ({
+      name: d.name.trim(),
+      slug: doctorSlug(d.name),
+      credentials: d.credentials || undefined,
+      title: d.title || undefined,
+      bio: d.bio || undefined,
+      sortOrder: i,
+    }));
+
+  // unique doctor slugs
+  const seen = new Set<string>();
+  for (const d of doctors) {
+    let s = d.slug;
+    let n = 2;
+    while (seen.has(s)) {
+      s = `${d.slug}-${n}`;
+      n += 1;
+    }
+    seen.add(s);
+    d.slug = s;
+  }
+
+  const teamRecords = (brief.teamMembers || [])
+    .filter((t) => t.name.trim())
+    .map((t, i) => ({
+      name: t.name.trim(),
+      role: t.role || undefined,
+      bio: t.bio || undefined,
+      sortOrder: i,
+    }));
+
+  const aboutBody =
+    brief.aboutContent?.trim() ||
+    `${brief.practiceName} is dedicated to comfortable, modern dentistry${
+      brief.city ? ` in ${brief.city}` : ""
+    }.${
+      brief.googleBusinessName
+        ? ` Find us on Google as “${brief.googleBusinessName}.”`
+        : ""
+    }`;
+
+  const pages: PageSpec[] = [
+    {
+      title: "Home",
+      slug: "",
+      template: "HOME",
+      h1: `Welcome to ${brief.practiceName}`,
+      showInNav: true,
+      navOrder: 0,
+    },
+    {
+      title: "About Us",
+      slug: "about",
+      template: "ABOUT",
+      h1: `About ${brief.practiceName}`,
+      showInNav: true,
+      navOrder: 1,
+      bodyOverride: aboutBody,
+    },
+    {
+      title: "Meet the Doctors",
+      slug: "about/doctors",
+      template: "DOCTORS",
+      h1: "Meet the Doctors",
+      showInNav: false,
+      navOrder: 2,
+    },
+    ...doctors.map((d, i) => ({
+      title: d.name,
+      slug: `about/doctors/${d.slug}`,
+      template: "DOCTOR" as const,
+      h1: [d.name, d.credentials].filter(Boolean).join(", "),
+      showInNav: false,
+      navOrder: 3 + i,
+      bodyOverride: d.bio || `${d.name} practices at ${brief.practiceName}.`,
+    })),
+    {
+      title: "Meet the Team",
+      slug: "about/team",
+      template: "TEAM",
+      h1: "Meet the Team",
+      showInNav: false,
+      navOrder: 40,
+      bodyOverride:
+        "Our skilled team supports every visit — bios and photos appear below. Team members do not have individual profile pages.",
+    },
+    {
+      title: "Services",
+      slug: "services",
+      template: "CUSTOM",
+      h1: `Dental Services at ${brief.practiceName}`,
+      showInNav: true,
+      navOrder: 50,
+      bodyOverride: `Explore our focus services: ${brief.services.join(", ")}.`,
+    },
+    ...brief.services.slice(0, 12).map((service, i) => ({
+      title: service,
+      slug: `services/${slugify(service)}`,
+      template: "SERVICE" as const,
+      h1: `${service}${brief.city ? ` in ${brief.city}` : ""}`,
+      showInNav: false,
+      navOrder: 51 + i,
+    })),
+    {
+      title: "New Patients",
+      slug: "new-patients",
+      template: "NEW_PATIENTS",
+      h1: "New Patients",
+      showInNav: true,
+      navOrder: 70,
+      bodyOverride:
+        brief.newPatientWelcome?.trim() ||
+        `Welcome to ${brief.practiceName}! Download paperwork below and review insurance & financing options.`,
+    },
+    {
+      title: "Insurance",
+      slug: "new-patients/insurance",
+      template: "INSURANCE",
+      h1: "Insurance",
+      showInNav: false,
+      navOrder: 71,
+      bodyOverride: [
+        brief.insuranceInNetwork
+          ? "We are an in-network dental office for many major plans."
+          : brief.insuranceAccepted
+            ? "We work with many dental insurance plans."
+            : "Contact us about payment options.",
+        brief.insuranceInfo,
+        brief.insuranceLogos?.length
+          ? `Plans / logos: ${brief.insuranceLogos.join(", ")}.`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    },
+    {
+      title: "Financing",
+      slug: "new-patients/financing",
+      template: "FINANCING",
+      h1: "Financing Options",
+      showInNav: false,
+      navOrder: 72,
+      bodyOverride: [
+        brief.financingProviders?.length
+          ? `We offer: ${brief.financingProviders.join(", ")}.`
+          : "",
+        brief.financingInfo,
+      ]
+        .filter(Boolean)
+        .join("\n\n") || "Ask our team about flexible financing.",
+    },
+    ...(brief.hasMembershipPlan
+      ? [
+          {
+            title: "Membership Plan",
+            slug: "new-patients/membership",
+            template: "MEMBERSHIP" as const,
+            h1: "Membership Plan",
+            showInNav: false,
+            navOrder: 73,
+            bodyOverride:
+              brief.membershipInfo?.trim() ||
+              `Ask ${brief.practiceName} about our in-house membership plan for patients without insurance.`,
+          },
+        ]
+      : []),
+    {
+      title: "Contact Us",
+      slug: "contact",
+      template: "CONTACT",
+      h1: `Contact ${brief.practiceName}`,
+      showInNav: true,
+      navOrder: 80,
+      bodyOverride: `We’d love to hear from you. Call ${brief.phone || "us"} or send a message — our team typically responds during business hours.`,
+    },
+    {
+      title: "Blog",
+      slug: "blog",
+      template: "BLOG",
+      h1: "Dental Blog",
+      showInNav: true,
+      navOrder: 90,
+      bodyOverride: `Tips and updates from ${brief.practiceName}. New posts can be added anytime in the client dashboard.`,
+    },
+  ];
+
+  return { pages, doctorRecords: doctors, teamRecords };
 }
 
-function sectionBody(type: SectionType, brief: SiteBrief, h1: string) {
-  if (type === "hero") {
-    return `Welcome to ${brief.practiceName}. Quality dental care${
-      brief.city ? ` in ${brief.city}` : ""
-    }.`;
-  }
+function sectionBody(
+  type: SectionType,
+  brief: SiteBrief,
+  page: PageSpec,
+) {
+  if (type === "hero") return page.bodyOverride?.split("\n\n")[0] || null;
+  if (type === "about") return brief.aboutContent || page.bodyOverride || null;
+  if (type === "content") return page.bodyOverride || null;
   if (type === "insurance") {
-    return brief.insuranceAccepted
-      ? brief.insuranceInfo?.trim() ||
-          "We accept many major dental insurance plans. Call us to verify your benefits."
-      : "Contact us to learn about payment options for your care.";
+    return [
+      brief.insuranceInNetwork ? "In-network office." : null,
+      brief.insuranceInfo,
+      brief.insuranceLogos?.length
+        ? `Logos / plans: ${brief.insuranceLogos.join(", ")}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
-  if (type === "about") {
-    const gbp = brief.googleBusinessName
-      ? ` Find us on Google as “${brief.googleBusinessName}.”`
-      : "";
-    return `${brief.practiceName} is dedicated to comfortable, modern dentistry.${gbp}`;
+  if (type === "financing") {
+    return [
+      brief.financingProviders?.length
+        ? `Providers: ${brief.financingProviders.join(", ")}`
+        : null,
+      brief.financingInfo,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  if (type === "doctors") {
+    return "Select a doctor below to view their full profile.";
+  }
+  if (type === "team") {
+    return "Meet the people who make your visit comfortable.";
+  }
+  if (type === "forms") {
+    return "New-patient paperwork can be uploaded by your practice in the CMS. Forms will appear here for download.";
   }
   if (type === "services") {
     return brief.services.length
@@ -119,10 +363,7 @@ function sectionBody(type: SectionType, brief: SiteBrief, h1: string) {
   if (type === "cta") {
     return brief.phone
       ? `Call ${brief.phone} to schedule your visit.`
-      : `Contact ${brief.practiceName} to schedule your visit.`;
-  }
-  if (type === "content" && h1.toLowerCase().includes("financ")) {
-    return brief.financingInfo || null;
+      : `Contact ${brief.practiceName} today.`;
   }
   return null;
 }
@@ -149,23 +390,14 @@ export async function createSiteFromBrief(input: {
     siteSlug = `${siteSlugBase}-${n}`;
   }
 
-  const pagesSpec: {
-    title: string;
-    slug: string;
-    template: "HOME" | "SERVICE" | "ABOUT" | "LOCATION" | "CONTACT" | "CUSTOM";
-    h1: string;
-  }[] = commandSitePages(briefToCommand(brief));
+  const { pages: pagesSpec, doctorRecords, teamRecords } =
+    buildPageSpecs(brief);
 
-  // Add insurance page content via HOME insurance section already in template;
-  // if financing info exists, include a short custom page.
-  if (brief.financingInfo?.trim()) {
-    pagesSpec.splice(-2, 0, {
-      title: "Financing",
-      slug: "financing",
-      template: "CUSTOM",
-      h1: `Financing at ${brief.practiceName}`,
-    });
-  }
+  const navStructure = buildNavStructure({
+    services: brief.services,
+    hasMembership: Boolean(brief.hasMembershipPlan),
+    doctors: doctorRecords.map((d) => ({ name: d.name, slug: d.slug })),
+  });
 
   const site = await prisma.site.create({
     data: {
@@ -186,16 +418,41 @@ export async function createSiteFromBrief(input: {
       businessHours: brief.businessHours ?? undefined,
       focusServices: brief.services,
       insuranceAccepted: brief.insuranceAccepted ?? false,
+      insuranceInNetwork: brief.insuranceInNetwork ?? false,
       insuranceInfo: brief.insuranceInfo || null,
+      insuranceLogos: brief.insuranceLogos || [],
       financingInfo: brief.financingInfo || null,
+      financingProviders: brief.financingProviders || [],
+      hasMembershipPlan: brief.hasMembershipPlan ?? false,
+      membershipInfo: brief.membershipInfo || null,
+      aboutContent: brief.aboutContent || null,
+      newPatientWelcome: brief.newPatientWelcome || null,
       questionnaire: brief.questionnaire ?? undefined,
+      navStructure,
       llmsSummary: `${brief.practiceName} dental practice${
         brief.city ? ` in ${brief.city}` : ""
       }${brief.services.length ? ` offering ${brief.services.join(", ")}` : ""}.`,
+      doctors: {
+        create: doctorRecords.map((d) => ({
+          name: d.name,
+          slug: d.slug,
+          credentials: d.credentials,
+          title: d.title,
+          bio: d.bio,
+          sortOrder: d.sortOrder,
+        })),
+      },
+      teamMembers: {
+        create: teamRecords.map((t) => ({
+          name: t.name,
+          role: t.role,
+          bio: t.bio,
+          sortOrder: t.sortOrder,
+        })),
+      },
       pages: {
-        create: pagesSpec.map((page, pageIndex) => {
-          const templateKey = page.template;
-          const template = PAGE_TEMPLATES[templateKey];
+        create: pagesSpec.map((page) => {
+          const template = PAGE_TEMPLATES[page.template];
           const faqs = defaultFaqs(brief, template.defaultFaqs);
           const sections = template.defaultSections.map(
             (type: SectionType, i: number) => {
@@ -210,7 +467,7 @@ export async function createSiteFromBrief(input: {
                       ? "Frequently asked questions"
                       : def.label,
                 headingLevel: def.headingLevel,
-                body: sectionBody(type, brief, page.h1),
+                body: sectionBody(type, brief, page),
               };
             },
           );
@@ -231,10 +488,7 @@ export async function createSiteFromBrief(input: {
             }),
             buildFaqPageSchema(faqs),
             buildBreadcrumbSchema([
-              {
-                name: "Home",
-                url: `https://${domainPlaceholder}/`,
-              },
+              { name: "Home", url: `https://${domainPlaceholder}/` },
               ...(page.slug
                 ? [
                     {
@@ -256,9 +510,9 @@ export async function createSiteFromBrief(input: {
             metaDescription:
               `${page.h1}. Visit ${brief.practiceName}${
                 brief.city ? ` in ${brief.city}` : ""
-              } for expert dental care.`.slice(0, 160),
-            showInNav: true,
-            navOrder: pageIndex,
+              }.`.slice(0, 160),
+            showInNav: page.showInNav ?? false,
+            navOrder: page.navOrder ?? 0,
             schemaJson,
             sections: { create: sections },
             faqs: { create: faqs },
@@ -267,9 +521,9 @@ export async function createSiteFromBrief(input: {
       },
     },
     include: {
-      pages: {
-        include: { faqs: true, sections: true },
-      },
+      pages: { include: { faqs: true, sections: true } },
+      doctors: true,
+      teamMembers: true,
     },
   });
 
@@ -289,8 +543,12 @@ export async function createSiteFromCommand(input: {
       city: parsed.city,
       state: parsed.state,
       country: "US",
-      services: parsed.services,
-      bilingual: parsed.bilingual,
+      services: parsed.services.length
+        ? parsed.services
+        : ["General dentistry"],
+      doctors: [{ name: "Dr. Smith", credentials: "DDS", title: "Dentist", bio: "" }],
+      insuranceAccepted: true,
+      insuranceInNetwork: true,
     },
   });
 }
@@ -317,8 +575,17 @@ export async function createSiteFromQuestionnaire(input: {
       inspirationWebsiteUrl: a.inspirationWebsiteUrl || undefined,
       businessHours: a.businessHours,
       insuranceAccepted: a.insuranceAccepted,
+      insuranceInNetwork: a.insuranceInNetwork,
       insuranceInfo: a.insuranceInfo || undefined,
+      insuranceLogos: a.insuranceLogos,
       financingInfo: a.financingInfo || undefined,
+      financingProviders: a.financingProviders,
+      hasMembershipPlan: a.hasMembershipPlan,
+      membershipInfo: a.membershipInfo || undefined,
+      aboutContent: a.aboutContent || undefined,
+      newPatientWelcome: a.newPatientWelcome || undefined,
+      doctors: a.doctors,
+      teamMembers: a.teamMembers,
       questionnaire: a,
     },
   });

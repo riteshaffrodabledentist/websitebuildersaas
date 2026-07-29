@@ -7,6 +7,10 @@ export type SectionType =
   | "services"
   | "about"
   | "insurance"
+  | "financing"
+  | "doctors"
+  | "team"
+  | "forms"
   | "location"
   | "cta"
   | "faq"
@@ -46,7 +50,35 @@ export const SECTION_CATALOG: Record<SectionType, SectionDefinition> = {
     type: "insurance",
     label: "Insurance",
     headingLevel: 2,
-    description: "Plans accepted",
+    description: "Plans accepted + logos",
+    allowsBody: true,
+  },
+  financing: {
+    type: "financing",
+    label: "Financing",
+    headingLevel: 2,
+    description: "CareCredit, Sunbit, membership, etc.",
+    allowsBody: true,
+  },
+  doctors: {
+    type: "doctors",
+    label: "Doctors",
+    headingLevel: 2,
+    description: "Doctor cards linking to individual profiles",
+    allowsBody: true,
+  },
+  team: {
+    type: "team",
+    label: "Team",
+    headingLevel: 2,
+    description: "Team bios on one page (no individual URLs)",
+    allowsBody: true,
+  },
+  forms: {
+    type: "forms",
+    label: "Patient forms",
+    headingLevel: 2,
+    description: "Downloadable paperwork managed in CMS",
     allowsBody: true,
   },
   location: {
@@ -94,8 +126,43 @@ export const PAGE_TEMPLATES: Record<
     defaultFaqs: 4,
   },
   ABOUT: {
-    label: "About",
-    defaultSections: ["hero", "about", "cta", "faq"],
+    label: "About Us",
+    defaultSections: ["hero", "about", "doctors", "team", "cta", "faq"],
+    defaultFaqs: 3,
+  },
+  DOCTORS: {
+    label: "Meet the Doctors",
+    defaultSections: ["hero", "doctors", "faq"],
+    defaultFaqs: 3,
+  },
+  DOCTOR: {
+    label: "Doctor profile",
+    defaultSections: ["hero", "content", "cta", "faq"],
+    defaultFaqs: 3,
+  },
+  TEAM: {
+    label: "Meet the Team",
+    defaultSections: ["hero", "team", "faq"],
+    defaultFaqs: 3,
+  },
+  NEW_PATIENTS: {
+    label: "New Patients",
+    defaultSections: ["hero", "content", "forms", "cta", "faq"],
+    defaultFaqs: 4,
+  },
+  INSURANCE: {
+    label: "Insurance",
+    defaultSections: ["hero", "insurance", "faq"],
+    defaultFaqs: 3,
+  },
+  FINANCING: {
+    label: "Financing",
+    defaultSections: ["hero", "financing", "faq"],
+    defaultFaqs: 3,
+  },
+  MEMBERSHIP: {
+    label: "Membership plan",
+    defaultSections: ["hero", "content", "cta", "faq"],
     defaultFaqs: 3,
   },
   LOCATION: {
@@ -104,9 +171,14 @@ export const PAGE_TEMPLATES: Record<
     defaultFaqs: 3,
   },
   CONTACT: {
-    label: "Contact",
-    defaultSections: ["hero", "location", "cta", "faq"],
+    label: "Contact Us",
+    defaultSections: ["hero", "content", "location", "cta", "faq"],
     defaultFaqs: 3,
+  },
+  BLOG: {
+    label: "Blog",
+    defaultSections: ["hero", "content", "faq"],
+    defaultFaqs: 2,
   },
   CUSTOM: {
     label: "Custom",

@@ -1,0 +1,74 @@
+-- AlterEnum
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'DOCTORS';
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'DOCTOR';
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'TEAM';
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'NEW_PATIENTS';
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'INSURANCE';
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'FINANCING';
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'MEMBERSHIP';
+ALTER TYPE "PageTemplate" ADD VALUE IF NOT EXISTS 'BLOG';
+
+-- AlterTable Site
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "insuranceInNetwork" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "insuranceLogos" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "financingProviders" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "hasMembershipPlan" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "membershipInfo" TEXT;
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "aboutContent" TEXT;
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "newPatientWelcome" TEXT;
+ALTER TABLE "Site" ADD COLUMN IF NOT EXISTS "navStructure" JSONB;
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "Doctor" (
+    "id" TEXT NOT NULL,
+    "siteId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "credentials" TEXT,
+    "title" TEXT,
+    "bio" TEXT,
+    "photoUrl" TEXT,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Doctor_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "TeamMember" (
+    "id" TEXT NOT NULL,
+    "siteId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "role" TEXT,
+    "bio" TEXT,
+    "photoUrl" TEXT,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "TeamMember_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "PatientForm" (
+    "id" TEXT NOT NULL,
+    "siteId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "fileUrl" TEXT NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "PatientForm_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Doctor_siteId_slug_key" ON "Doctor"("siteId", "slug");
+
+DO $$ BEGIN
+ ALTER TABLE "Doctor" ADD CONSTRAINT "Doctor_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "TeamMember" ADD CONSTRAINT "TeamMember_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+ ALTER TABLE "PatientForm" ADD CONSTRAINT "PatientForm_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "Site"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
