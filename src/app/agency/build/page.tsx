@@ -517,10 +517,95 @@ export default function BuildSitePage() {
                   className="field"
                 />
               </Field>
-              <p className="text-xs text-stone-500">
-                Paperwork PDFs are added later in the client CMS under New
-                Patients → Forms.
-              </p>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-semibold">Paperwork (PDF or direct link)</h3>
+                  <button
+                    type="button"
+                    className="text-sm text-teal-700"
+                    onClick={() =>
+                      update("patientForms", [
+                        ...form.patientForms,
+                        {
+                          title: "",
+                          description: "",
+                          kind: "LINK",
+                          url: "",
+                        },
+                      ])
+                    }
+                  >
+                    + Add form
+                  </button>
+                </div>
+                <p className="mb-3 text-xs text-stone-500">
+                  Use a hosted PDF URL or any external paperwork link (Google
+                  Form, DocuSign, practice portal, etc.). Clients can add more
+                  later in the CMS.
+                </p>
+                <div className="space-y-3">
+                  {form.patientForms.map((pf, idx) => (
+                    <div
+                      key={idx}
+                      className="grid gap-2 rounded-xl border border-stone-200 p-3 sm:grid-cols-2"
+                    >
+                      <input
+                        className="field"
+                        placeholder="Form title *"
+                        value={pf.title}
+                        onChange={(e) => {
+                          const next = [...form.patientForms];
+                          next[idx] = { ...next[idx], title: e.target.value };
+                          update("patientForms", next);
+                        }}
+                      />
+                      <select
+                        className="field"
+                        value={pf.kind}
+                        onChange={(e) => {
+                          const next = [...form.patientForms];
+                          next[idx] = {
+                            ...next[idx],
+                            kind: e.target.value as "PDF" | "LINK",
+                          };
+                          update("patientForms", next);
+                        }}
+                      >
+                        <option value="PDF">PDF file URL</option>
+                        <option value="LINK">Direct link</option>
+                      </select>
+                      <input
+                        className="field sm:col-span-2"
+                        placeholder={
+                          pf.kind === "PDF"
+                            ? "https://.../new-patient.pdf"
+                            : "https://forms.example.com/new-patient"
+                        }
+                        value={pf.url}
+                        onChange={(e) => {
+                          const next = [...form.patientForms];
+                          next[idx] = { ...next[idx], url: e.target.value };
+                          update("patientForms", next);
+                        }}
+                      />
+                      <input
+                        className="field sm:col-span-2"
+                        placeholder="Short description (optional)"
+                        value={pf.description || ""}
+                        onChange={(e) => {
+                          const next = [...form.patientForms];
+                          next[idx] = {
+                            ...next[idx],
+                            description: e.target.value,
+                          };
+                          update("patientForms", next);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <label className="flex items-center gap-2 text-sm">
                 <input

@@ -46,6 +46,11 @@ enum PageTemplate {
   BLOG
 }
 
+enum PatientFormKind {
+  PDF
+  LINK
+}
+
 enum AltSource {
   AI
   HUMAN
@@ -324,16 +329,18 @@ model TeamMember {
   site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 }
 
-/// Client-managed new-patient paperwork uploads.
+/// Client-managed new-patient paperwork — PDF file URL or external link.
 model PatientForm {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   siteId      String
   title       String
   description String?
-  fileUrl     String
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  kind        PatientFormKind @default(PDF)
+  /// PDF storage URL or external paperwork link
+  url         String
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
 }

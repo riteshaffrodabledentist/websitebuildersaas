@@ -78,7 +78,7 @@ export const SECTION_CATALOG: Record<SectionType, SectionDefinition> = {
     type: "forms",
     label: "Patient forms",
     headingLevel: 2,
-    description: "Downloadable paperwork managed in CMS",
+    description: "PDF uploads or direct links managed in CMS",
     allowsBody: true,
   },
   location: {

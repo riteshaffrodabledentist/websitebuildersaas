@@ -50,6 +50,13 @@ export const INSURANCE_LOGO_OPTIONS = [
   "Medicaid",
 ] as const;
 
+export const PatientFormInputSchema = z.object({
+  title: z.string().min(2).max(160),
+  description: z.string().max(1000).optional().or(z.literal("")),
+  kind: z.enum(["PDF", "LINK"]).default("LINK"),
+  url: z.string().url(),
+});
+
 export const SiteQuestionnaireSchema = z.object({
   businessName: z.string().min(2).max(120),
   googleBusinessName: z.string().max(160).optional().or(z.literal("")),
@@ -68,6 +75,7 @@ export const SiteQuestionnaireSchema = z.object({
   doctors: z.array(DoctorInputSchema).default([]),
   teamMembers: z.array(TeamInputSchema).default([]),
   newPatientWelcome: z.string().max(8000).optional().or(z.literal("")),
+  patientForms: z.array(PatientFormInputSchema).default([]),
   businessHours: z.array(DayHoursSchema).default([]),
   insuranceAccepted: z.boolean().default(false),
   insuranceInNetwork: z.boolean().default(false),
@@ -131,6 +139,7 @@ export function emptyQuestionnaire(): SiteQuestionnaire {
     teamMembers: [],
     newPatientWelcome:
       "Welcome to our practice! We’re excited to meet you. Complete your paperwork before your visit to save time at check-in.",
+    patientForms: [],
     businessHours: DEFAULT_HOURS,
     insuranceAccepted: true,
     insuranceInNetwork: true,

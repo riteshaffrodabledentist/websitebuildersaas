@@ -37,6 +37,7 @@ export type SiteBrief = {
   membershipInfo?: string;
   aboutContent?: string;
   newPatientWelcome?: string;
+  patientForms?: SiteQuestionnaire["patientForms"];
   doctors?: SiteQuestionnaire["doctors"];
   teamMembers?: SiteQuestionnaire["teamMembers"];
   questionnaire?: SiteQuestionnaire;
@@ -353,7 +354,10 @@ function sectionBody(
     return "Meet the people who make your visit comfortable.";
   }
   if (type === "forms") {
-    return "New-patient paperwork can be uploaded by your practice in the CMS. Forms will appear here for download.";
+    const count = brief.patientForms?.length ?? 0;
+    return count
+      ? `${count} form(s) available as PDF download or direct link. Clients can add more anytime in the CMS.`
+      : "Add paperwork as a PDF upload or a direct link in the CMS. Forms appear here for patients.";
   }
   if (type === "services") {
     return brief.services.length
@@ -449,6 +453,17 @@ export async function createSiteFromBrief(input: {
           bio: t.bio,
           sortOrder: t.sortOrder,
         })),
+      },
+      patientForms: {
+        create: (brief.patientForms || [])
+          .filter((f) => f.title.trim() && f.url.trim())
+          .map((f, i) => ({
+            title: f.title.trim(),
+            description: f.description || null,
+            kind: f.kind,
+            url: f.url.trim(),
+            sortOrder: i,
+          })),
       },
       pages: {
         create: pagesSpec.map((page) => {
@@ -584,6 +599,7 @@ export async function createSiteFromQuestionnaire(input: {
       membershipInfo: a.membershipInfo || undefined,
       aboutContent: a.aboutContent || undefined,
       newPatientWelcome: a.newPatientWelcome || undefined,
+      patientForms: a.patientForms,
       doctors: a.doctors,
       teamMembers: a.teamMembers,
       questionnaire: a,
